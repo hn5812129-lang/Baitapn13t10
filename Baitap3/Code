@@ -1,0 +1,132 @@
+using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace WinFormsApp7
+{
+    public partial class Form1 : Form
+    {
+        private MenuStrip menuStripMain;
+        private ToolStrip toolStripMain;
+        private StatusStrip statusStripMain;
+        private ToolStripStatusLabel lblStatusMessage;
+        private ToolStripStatusLabel lblTime;
+        private System.Windows.Forms.Timer timerClock;
+
+        public Form1()
+        {
+            this.IsMdiContainer = true;
+            this.Width = 1100;
+            this.Height = 700;
+            this.Text = "Hệ thống Quản lý Đa cửa sổ - Async/Await (MDI Parent)";
+            this.StartPosition = FormStartPosition.CenterScreen;
+
+            InitializeMdiFramework();
+        }
+
+        private void InitializeMdiFramework()
+        {
+            menuStripMain = new MenuStrip();
+
+            ToolStripMenuItem menuHeThong = new ToolStripMenuItem("Hệ thống");
+            ToolStripMenuItem itemDangXuat = new ToolStripMenuItem("Đăng xuất", null, (s, e) => {
+                MessageBox.Show("Đã đăng xuất hệ thống!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                UpdateStatus("Hệ thống: Người dùng đã đăng xuất.");
+            });
+            ToolStripMenuItem itemThoat = new ToolStripMenuItem("Thoát", null, (s, e) => Application.Exit());
+            menuHeThong.DropDownItems.Add(itemDangXuat);
+            menuHeThong.DropDownItems.Add(new ToolStripSeparator());
+            menuHeThong.DropDownItems.Add(itemThoat);
+
+            ToolStripMenuItem menuDanhMuc = new ToolStripMenuItem("Danh mục");
+            ToolStripMenuItem itemQuanLySV = new ToolStripMenuItem("Quản lý Sinh viên", null, (s, e) => OpenChildForm<FormStudent>());
+            menuDanhMuc.DropDownItems.Add(itemQuanLySV);
+
+            ToolStripMenuItem menuCuaSo = new ToolStripMenuItem("Cửa sổ");
+            ToolStripMenuItem itemCascade = new ToolStripMenuItem("Cascade (Xếp chồng)", null, (s, e) => this.LayoutMdi(MdiLayout.Cascade));
+            ToolStripMenuItem itemTileH = new ToolStripMenuItem("Tile Horizontal (Ngang)", null, (s, e) => this.LayoutMdi(MdiLayout.TileHorizontal));
+            ToolStripMenuItem itemTileV = new ToolStripMenuItem("Tile Vertical (Dọc)", null, (s, e) => this.LayoutMdi(MdiLayout.TileVertical));
+            menuCuaSo.DropDownItems.AddRange(new ToolStripItem[] { itemCascade, itemTileH, itemTileV });
+
+            menuStripMain.Items.AddRange(new ToolStripItem[] { menuHeThong, menuDanhMuc, menuCuaSo });
+            this.MainMenuStrip = menuStripMain;
+            this.Controls.Add(menuStripMain);
+
+            toolStripMain = new ToolStrip();
+            ToolStripButton btnShortcutSV = new ToolStripButton("Quản lý Sinh viên", null, (s, e) => OpenChildForm<FormStudent>());
+            toolStripMain.Items.Add(btnShortcutSV);
+            this.Controls.Add(toolStripMain);
+
+            statusStripMain = new StatusStrip();
+            lblStatusMessage = new ToolStripStatusLabel("Trạng thái: Sẵn sàng | Người dùng: Hiếu");
+            lblStatusMessage.Spring = true;
+            lblStatusMessage.TextAlign = ContentAlignment.MiddleLeft;
+
+            lblTime = new ToolStripStatusLabel();
+            statusStripMain.Items.AddRange(new ToolStripItem[] { lblStatusMessage, lblTime });
+            this.Controls.Add(statusStripMain);
+
+            timerClock = new System.Windows.Forms.Timer();
+            timerClock.Interval = 1000;
+            timerClock.Tick += (s, e) => { lblTime.Text = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"); };
+            timerClock.Start();
+        }
+
+        private void OpenChildForm<T>() where T : Form, new()
+        {
+            foreach (Form child in this.MdiChildren)
+            {
+                if (child is T)
+                {
+                    child.Activate();
+                    UpdateStatus($"Đã kích hoạt cửa sổ: {child.Text}");
+                    return;
+                }
+            }
+
+            T newForm = new T();
+            newForm.MdiParent = this;
+            
+            if (newForm is FormStudent studentForm)
+            {
+                studentForm.OnStatusMessageChanged += (msg) => UpdateStatus(msg);
+            }
+
+            newForm.Show();
+            UpdateStatus($"Đã mở cửa sổ mới: {newForm.Text}");
+        }
+
+        public void UpdateStatus(string message)
+        {
+            lblStatusMessage.Text = $"Trạng thái: {message}";
+        }
+    }
+
+    // ==========================================
+    // MDI CHILD: FORM QUẢN LÝ SINH VIÊN (Tích hợp Async/Await & ProgressBar)
+    // ==========================================
+    public class FormStudent : Form
+    {
+        public class Student
+        {
+            public string StudentId { get; set; } = string.Empty;
+            public string FullName { get; set; } = string.Empty;
+            public int Age { get; set; }
+            public string Gender { get; set; } = string.Empty;
+            public string AvatarPath { get; set; } = string.Empty;
+        }
+
+        private DataGridView dataGridView1 = null!;
+        private TextBox txtStudentId = null!;
+        private TextBox txtFullName = null!;
+        private TextBox txtAge = null!;
+        private ComboBox cbGender = null!;
+        private PictureBox pictureBoxAvatar = null!;
+        private Button btnThem = null!;
+        private Button btnXoa = null!;
+        private Button btnCapNhat = null!;
+        private Button btnNapDu
