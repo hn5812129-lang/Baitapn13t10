@@ -1,0 +1,295 @@
+using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Text;
+using System.Windows.Forms;
+
+namespace WinFormsApp6
+{
+    public partial class Form1 : Form
+    {
+        // 1. Khai báo lớp Student (dùng kiểu string? để tránh cảnh báo null)
+        public class Student
+        {
+            public string StudentId { get; set; } = string.Empty;
+            public string FullName { get; set; } = string.Empty;
+            public int Age { get; set; }
+            public string Gender { get; set; } = string.Empty;
+            public string AvatarPath { get; set; } = string.Empty;
+        }
+
+        // Khai báo các Control trên Form
+        private DataGridView dataGridView1 = null!;
+        private TextBox txtStudentId = null!;
+        private TextBox txtFullName = null!;
+        private TextBox txtAge = null!;
+        private ComboBox cbGender = null!;
+        private PictureBox pictureBoxAvatar = null!;
+        private Button btnChonAnh = null!;
+        private Button btnThem = null!;
+        private Button btnXoa = null!;
+        private Button btnCapNhat = null!;
+        private Button btnXuatCSV = null!;
+
+        private Label lblId, lblName, lblAge, lblGender;
+
+        // Khai báo BindingList và BindingSource
+        private BindingList<Student> listStudents = null!;
+        private BindingSource bindingSource = null!;
+
+        public Form1()
+        {
+            // Thiết lập kích thước Form
+            this.Width = 900;
+            this.Height = 550;
+            this.Text = "Quản lý Sinh Viên - BindingSource & File";
+            this.StartPosition = FormStartPosition.CenterScreen;
+
+            // Khởi tạo các Control bằng code
+            InitializeCustomComponents();
+
+            // Khởi tạo dữ liệu và liên kết BindingSource
+            InitDataAndBinding();
+        }
+
+        private void InitializeCustomComponents()
+        {
+            // DataGridView hiển thị danh sách
+            dataGridView1 = new DataGridView();
+            dataGridView1.Location = new Point(20, 20);
+            dataGridView1.Size = new Size(520, 460);
+            dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGridView1.ReadOnly = true;
+            this.Controls.Add(dataGridView1);
+
+            int startX = 560;
+            int startY = 20;
+
+            // PictureBox Avatar
+            pictureBoxAvatar = new PictureBox();
+            pictureBoxAvatar.Location = new Point(startX + 60, startY);
+            pictureBoxAvatar.Size = new Size(120, 150);
+            pictureBoxAvatar.SizeMode = PictureBoxSizeMode.StretchImage;
+            pictureBoxAvatar.BorderStyle = BorderStyle.FixedSingle;
+            this.Controls.Add(pictureBoxAvatar);
+
+            // Nút Chọn ảnh
+            btnChonAnh = new Button();
+            btnChonAnh.Text = "Chọn ảnh";
+            btnChonAnh.Location = new Point(startX + 60, startY + 160);
+            btnChonAnh.Size = new Size(120, 30);
+            btnChonAnh.Click += btnChonAnh_Click;
+            this.Controls.Add(btnChonAnh);
+
+            // Mã SV
+            lblId = new Label(); lblId.Text = "Mã SV:"; lblId.Location = new Point(startX, startY + 210); lblId.AutoSize = true;
+            txtStudentId = new TextBox(); txtStudentId.Location = new Point(startX + 90, startY + 207); txtStudentId.Size = new Size(160, 22);
+            this.Controls.Add(lblId); this.Controls.Add(txtStudentId);
+
+            // Họ tên
+            lblName = new Label(); lblName.Text = "Họ tên:"; lblName.Location = new Point(startX, startY + 245); lblName.AutoSize = true;
+            txtFullName = new TextBox(); txtFullName.Location = new Point(startX + 90, startY + 242); txtFullName.Size = new Size(160, 22);
+            this.Controls.Add(lblName); this.Controls.Add(txtFullName);
+
+            // Tuổi
+            lblAge = new Label(); lblAge.Text = "Tuổi:"; lblAge.Location = new Point(startX, startY + 280); lblAge.AutoSize = true;
+            txtAge = new TextBox(); txtAge.Location = new Point(startX + 90, startY + 277); txtAge.Size = new Size(160, 22);
+            this.Controls.Add(lblAge); this.Controls.Add(txtAge);
+
+            // Giới tính
+            lblGender = new Label(); lblGender.Text = "Giới tính:"; lblGender.Location = new Point(startX, startY + 315); lblGender.AutoSize = true;
+            cbGender = new ComboBox(); cbGender.Location = new Point(startX + 90, startY + 312); cbGender.Size = new Size(160, 22);
+            cbGender.Items.AddRange(new string[] { "Nam", "Nữ" });
+            this.Controls.Add(lblGender); this.Controls.Add(cbGender);
+
+            // Cụm chức năng (Nút bấm)
+            int btnY = startY + 360;
+
+            btnThem = new Button(); btnThem.Text = "Thêm"; btnThem.Location = new Point(startX, btnY); btnThem.Size = new Size(75, 35);
+            btnThem.Click += btnThem_Click;
+            this.Controls.Add(btnThem);
+
+            btnXoa = new Button(); btnXoa.Text = "Xóa"; btnXoa.Location = new Point(startX + 85, btnY); btnXoa.Size = new Size(75, 35);
+            btnXoa.Click += btnXoa_Click;
+            this.Controls.Add(btnXoa);
+
+            btnCapNhat = new Button(); btnCapNhat.Text = "Cập nhật"; btnCapNhat.Location = new Point(startX + 170, btnY); btnCapNhat.Size = new Size(75, 35);
+            btnCapNhat.Click += btnCapNhat_Click;
+            this.Controls.Add(btnCapNhat);
+
+            btnXuatCSV = new Button(); btnXuatCSV.Text = "Xuất CSV"; btnXuatCSV.Location = new Point(startX + 85, btnY + 45); btnXuatCSV.Size = new Size(160, 35);
+            btnXuatCSV.BackColor = Color.LightGreen;
+            btnXuatCSV.Click += btnXuatCSV_Click;
+            this.Controls.Add(btnXuatCSV);
+        }
+
+        private void InitDataAndBinding()
+        {
+            // Khởi tạo danh sách mẫu
+            listStudents = new BindingList<Student>
+            {
+                new Student { StudentId = "SV001", FullName = "Nguyễn Văn A", Age = 20, Gender = "Nam", AvatarPath = "" },
+                new Student { StudentId = "SV002", FullName = "Trần Thị B", Age = 19, Gender = "Nữ", AvatarPath = "" }
+            };
+
+            // Khởi tạo BindingSource
+            bindingSource = new BindingSource();
+            bindingSource.DataSource = listStudents;
+
+            // Gắn BindingSource cho DataGridView
+            dataGridView1.DataSource = bindingSource;
+
+            // Ràng buộc dữ liệu 2 chiều (DataBindings) giữa Control nhập liệu và BindingSource
+            txtStudentId.DataBindings.Add("Text", bindingSource, "StudentId", true, DataSourceUpdateMode.OnPropertyChanged);
+            txtFullName.DataBindings.Add("Text", bindingSource, "FullName", true, DataSourceUpdateMode.OnPropertyChanged);
+            txtAge.DataBindings.Add("Text", bindingSource, "Age", true, DataSourceUpdateMode.OnPropertyChanged);
+            cbGender.DataBindings.Add("Text", bindingSource, "Gender", true, DataSourceUpdateMode.OnPropertyChanged);
+
+            // Sự kiện khi chuyển dòng trên DataGridView để load lại ảnh Avatar tương ứng
+            bindingSource.CurrentChanged += BindingSource_CurrentChanged;
+
+            // Load ảnh cho dòng đầu tiên
+            LoadCurrentAvatar();
+        }
+
+        private void BindingSource_CurrentChanged(object sender, EventArgs e)
+        {
+            LoadCurrentAvatar();
+        }
+
+        private void LoadCurrentAvatar()
+        {
+            if (bindingSource.Current is Student currentStudent)
+            {
+                if (!string.IsNullOrEmpty(currentStudent.AvatarPath) && File.Exists(currentStudent.AvatarPath))
+                {
+                    try
+                    {
+                        using (var stream = new FileStream(currentStudent.AvatarPath, FileMode.Open, FileAccess.Read))
+                        {
+                            pictureBoxAvatar.Image = Image.FromStream(stream);
+                        }
+                    }
+                    catch
+                    {
+                        pictureBoxAvatar.Image = null;
+                    }
+                }
+                else
+                {
+                    pictureBoxAvatar.Image = null;
+                }
+            }
+            else
+            {
+                pictureBoxAvatar.Image = null;
+            }
+        }
+
+        // Chọn ảnh Avatar (.jpg, .png, .bmp)
+        private void btnChonAnh_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    if (bindingSource.Current is Student currentStudent)
+                    {
+                        currentStudent.AvatarPath = ofd.FileName;
+                        LoadCurrentAvatar();
+                        bindingSource.ResetCurrentItem();
+                    }
+                }
+            }
+        }
+
+        // Thêm sinh viên mới
+        private void btnThem_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtStudentId.Text))
+            {
+                MessageBox.Show("Vui lòng nhập Mã sinh viên!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int.TryParse(txtAge.Text, out int age);
+
+            Student newStudent = new Student
+            {
+                StudentId = txtStudentId.Text.Trim(),
+                FullName = txtFullName.Text.Trim(),
+                Age = age,
+                Gender = cbGender.Text,
+                AvatarPath = pictureBoxAvatar.Image != null && bindingSource.Current is Student s ? s.AvatarPath : ""
+            };
+
+            listStudents.Add(newStudent);
+            bindingSource.Position = listStudents.Count - 1;
+            MessageBox.Show("Thêm sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // Xóa sinh viên đang chọn
+        private void btnXoa_Click(object sender, EventArgs e)
+        {
+            if (bindingSource.Current is Student currentStudent)
+            {
+                var confirm = MessageBox.Show($"Bạn có chắc chắn muốn xóa sinh viên {currentStudent.FullName}?", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (confirm == DialogResult.Yes)
+                {
+                    bindingSource.RemoveCurrent();
+                    MessageBox.Show("Đã xóa thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Không có sinh viên nào được chọn để xóa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Cập nhật thông tin
+        private void btnCapNhat_Click(object sender, EventArgs e)
+        {
+            bindingSource.EndEdit();
+            dataGridView1.Refresh();
+            MessageBox.Show("Cập nhật thông tin thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // Xuất file CSV (Hỗ trợ tiếng Việt UTF-8 chuẩn có BOM)
+        private void btnXuatCSV_Click(object sender, EventArgs e)
+        {
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "CSV file (*.csv)|*.csv";
+                sfd.FileName = "DanhSachSinhVien.csv";
+
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        using (StreamWriter sw = new StreamWriter(sfd.FileName, false, new UTF8Encoding(true)))
+                        {
+                            // Ghi tiêu đề cột
+                            sw.WriteLine("StudentId,FullName,Age,Gender,AvatarPath");
+
+                            // Ghi dữ liệu
+                            foreach (var st in listStudents)
+                            {
+                                string line = $"{st.StudentId},\"{st.FullName}\",{st.Age},{st.Gender},\"{st.AvatarPath}\"";
+                                sw.WriteLine(line);
+                            }
+                        }
+
+                        MessageBox.Show("Xuất file CSV thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Lỗi khi xuất file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+    }
+}
